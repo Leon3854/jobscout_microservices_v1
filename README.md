@@ -1,6 +1,7 @@
 # jobscout_microservices_v1
 
 
+## Структура Проекта
 ```text
 jobscout-microservices/
 ├── docker-compose.yml              # Все сервисы
