@@ -1,5 +1,30 @@
 # jobscout_microservices_v1
 
+Микросервисная архитектура JobScout - AI-платформы для поиска работы.
+
+
+## Архитектура
+
+- **API Gateway** (Nest.js) - входная точка
+- **Auth Service** (Nest.js) - JWT, 2FA, OAuth
+- **User Service** (Nest.js) - профили пользователей
+- **Chat Service** (Go) - WebSocket чат
+- **Job Service** (Python) - AI-агенты, краулеры
+
+## Быстрый старт
+
+```bash
+# 1. Клонировать репозиторий
+git clone https://github.com/yourusername/jobscout-microservices.git
+
+# 2. Создать .env из .env.example
+cp .env.example .env
+# Отредактировать .env
+
+# 3. Запустить инфраструктуру
+make up
+
+# 4. Запустить сервисы (см. документацию в services/)
 
 ## Структура Проекта
 ```text
