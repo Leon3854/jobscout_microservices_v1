@@ -1,0 +1,53 @@
+// use prisma-next
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?
+  fullName     String?
+  isActive     Boolean  @default(true)
+  createdAt    TimestamptzString @default(now())
+  updatedAt    temporal.updatedAtString()
+
+  profile        UserProfile?
+  twoFactorCodes TwoFactorCode[]
+  refreshTokens  RefreshToken[]
+}
+
+model UserProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  bio             String?
+  skills          String[]
+  experienceYears Int?
+  createdAt       TimestamptzString @default(now())
+  updatedAt       temporal.updatedAtString()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TwoFactorCode {
+  id        String   @id @default(uuid())
+  userId    String
+  code      String
+  purpose   String
+  isUsed    Boolean  @default(false)
+  expiresAt TimestamptzString
+  createdAt TimestamptzString @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt TimestamptzString
+  createdAt TimestamptzString @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
