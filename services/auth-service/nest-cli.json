@@ -3,6 +3,18 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "tsConfigPath": "tsconfig.json",
+    "assets": [
+      {
+        "include": "prisma/contract.json",
+        "outDir": "dist"
+      },
+      {
+        "include": "prisma/contract.d.ts",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
   }
 }

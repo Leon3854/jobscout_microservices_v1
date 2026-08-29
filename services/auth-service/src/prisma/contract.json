@@ -208,6 +208,13 @@
                   "kind": "scalar"
                 }
               },
+              "deletedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
               "email": {
                 "nullable": false,
                 "type": {
@@ -236,7 +243,36 @@
                   "kind": "scalar"
                 }
               },
+              "lastLoginAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
               "passwordHash": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "twoFactorBackupCodes": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "twoFactorEnabled": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "twoFactorSecret": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -303,6 +339,9 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "deletedAt": {
+                  "column": "deletedAt"
+                },
                 "email": {
                   "column": "email"
                 },
@@ -315,8 +354,20 @@
                 "isActive": {
                   "column": "isActive"
                 },
+                "lastLoginAt": {
+                  "column": "lastLoginAt"
+                },
                 "passwordHash": {
                   "column": "passwordHash"
+                },
+                "twoFactorBackupCodes": {
+                  "column": "twoFactorBackupCodes"
+                },
+                "twoFactorEnabled": {
+                  "column": "twoFactorEnabled"
+                },
+                "twoFactorSecret": {
+                  "column": "twoFactorSecret"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -599,6 +650,13 @@
               "uniques": []
             },
             "user": {
+              "checks": [
+                {
+                  "expression": "array_position(\"twoFactorBackupCodes\", NULL) IS NULL",
+                  "name": "user_twoFactorBackupCodes_elem_not_null_cf5f42a4",
+                  "prefix": "user_twoFactorBackupCodes_elem_not_null"
+                }
+              ],
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
@@ -608,6 +666,11 @@
                   },
                   "nativeType": "timestamptz",
                   "nullable": false
+                },
+                "deletedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
                 },
                 "email": {
                   "codecId": "pg/text@1",
@@ -633,7 +696,32 @@
                   "nativeType": "bool",
                   "nullable": false
                 },
+                "lastLoginAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "passwordHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "twoFactorBackupCodes": {
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "twoFactorEnabled": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "twoFactorSecret": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -748,7 +836,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "700cf1e276facbf4393206b770b81ae053bb4254b542b6a07c96308091bd4eb4"
+    "storageHash": "36d6150a02cdfb8ae3f76e2b332fdcfe90300205fa175c440cf70054b10e9c76"
   },
   "execution": {
     "executionHash": "fe593544e23ce93a220317bc343e985d7b21ca12533ddf6c97d4f7073c3096f5",

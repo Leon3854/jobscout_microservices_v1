@@ -6,8 +6,13 @@ model User {
   passwordHash String?
   fullName     String?
   isActive     Boolean  @default(true)
+  twoFactorEnabled     Boolean  @default(false)
+  twoFactorSecret      String?
+  twoFactorBackupCodes String[]
+  lastLoginAt  TimestamptzString?
   createdAt    TimestamptzString @default(now())
   updatedAt    temporal.updatedAtString()
+  deletedAt    TimestamptzString?
 
   profile        UserProfile?
   twoFactorCodes TwoFactorCode[]
