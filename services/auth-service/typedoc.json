@@ -1,0 +1,13 @@
+{
+  "entryPoints": ["src/**/*.ts"],
+  "out": "docs",
+  "exclude": ["**/*.spec.ts", "**/node_modules/**"],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "theme": "default",
+  "name": "JobScout Auth Service API",
+  "includeVersion": true,
+  "readme": "README.md",
+  "categorizeByGroup": true,
+  "searchInComments": true
+}

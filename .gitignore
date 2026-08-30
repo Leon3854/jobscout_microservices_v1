@@ -1,5 +1,22 @@
 node_modules/
 .env
+.git
+
+docs/
+docs
+
+
+coverage/
+coverage
+
+tests/
+tests
+
+test/
+test
+
+README.md
+
 
 # Dependencies
 node_modules/
