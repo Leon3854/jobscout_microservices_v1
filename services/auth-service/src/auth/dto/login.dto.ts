@@ -2,7 +2,7 @@ import { IsEmail, IsString, IsOptional, Length } from 'class-validator';
 
 /**
  * DTO для входа в систему.
- * 
+ *
  * @example
  * ```typescript
  * const dto = new LoginDto();

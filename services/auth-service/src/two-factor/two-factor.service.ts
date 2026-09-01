@@ -1,4 +1,9 @@
-import { Injectable, Inject, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PRISMA_DB } from '../prisma/prisma.module';
 import { RedisService } from '../redis/redis.service';
 import { authenticator } from 'otplib';
@@ -8,7 +13,7 @@ import * as bcrypt from 'bcrypt';
 /**
  * Сервис двухфакторной аутентификации.
  * Поддерживает TOTP (Time-based One-Time Password).
- * 
+ *
  * @class TwoFactorService
  */
 @Injectable()
@@ -28,7 +33,7 @@ export class TwoFactorService {
 
   /**
    * Сгенерировать секрет для 2FA.
-   * 
+   *
    * @param userId - ID пользователя
    * @returns Секрет и URI для QR кода
    */
@@ -60,7 +65,7 @@ export class TwoFactorService {
 
   /**
    * Верифицировать и активировать 2FA.
-   * 
+   *
    * @param userId - ID пользователя
    * @param token - TOTP код для верификации
    * @returns true если 2FA активирована
@@ -101,7 +106,7 @@ export class TwoFactorService {
 
   /**
    * Верифицировать TOTP код.
-   * 
+   *
    * @param userId - ID пользователя
    * @param token - TOTP код
    * @returns true если код валиден
@@ -132,7 +137,7 @@ export class TwoFactorService {
 
   /**
    * Отключить 2FA.
-   * 
+   *
    * @param userId - ID пользователя
    */
   async disable(userId: string): Promise<void> {
@@ -149,7 +154,7 @@ export class TwoFactorService {
 
   /**
    * Сгенерировать резервные коды.
-   * 
+   *
    * @param userId - ID пользователя
    * @returns Массив резервных кодов
    */

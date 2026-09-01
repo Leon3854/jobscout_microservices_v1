@@ -4,7 +4,7 @@ import { IsStrongPassword } from '../../common/decorators/is-strong-password.dec
 /**
  * DTO для создания нового пользователя.
  * Используется при регистрации.
- * 
+ *
  * @example
  * ```typescript
  * const dto = new CreateUserDto();

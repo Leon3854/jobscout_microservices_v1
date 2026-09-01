@@ -1,4 +1,10 @@
-import { Injectable, Inject, ConflictException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PRISMA_DB } from '../prisma/prisma.module';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -29,9 +35,9 @@ export class UsersService {
 
     try {
       // Проверяем существование пользователя
-      const existingUser = await this.db.orm.public.User
-        .where({ email: createUserDto.email })
-        .first();
+      const existingUser = await this.db.orm.public.User.where({
+        email: createUserDto.email,
+      }).first();
 
       if (existingUser) {
         throw new ConflictException('User with this email already exists');
@@ -67,14 +73,20 @@ export class UsersService {
           timestamp: new Date().toISOString(),
         });
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
         this.logger.warn(`Failed to publish event: ${errorMessage}`);
       }
 
       this.logger.log(`User created: ${user.email}`);
 
       // Возвращаем без пароля
-      const { passwordHash: _hash, twoFactorSecret: _secret, twoFactorBackupCodes: _codes, ...safeUser } = user;
+      const {
+        passwordHash: _passwordHash,
+        twoFactorSecret: _twoFactorSecret,
+        twoFactorBackupCodes: _twoBackupCodes,
+        ...safeUser
+      } = user;
       return safeUser;
     } finally {
       await this.redisService.unlock(lockKey);
@@ -91,16 +103,19 @@ export class UsersService {
       return cached;
     }
 
-    const user = await this.db.orm.public.User
-      .where({ id })
-      .first();
+    const user = await this.db.orm.public.User.where({ id }).first();
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     // Убираем чувствительные данные
-    const { passwordHash: _hash, twoFactorSecret: _secret, twoFactorBackupCodes: _codes, ...safeUser } = user;
+    const {
+      passwordHash: _passwordHash,
+      twoFactorSecret: _twoFactorSecret,
+      twoFactorBackupCodes: _twoFactorBackupCodes,
+      ...safeUser
+    } = user;
 
     // Кешируем на 5 минут
     await this.redisService.set(`user:${id}`, safeUser, 300);
@@ -112,9 +127,7 @@ export class UsersService {
    * Найти пользователя по email (включая пароль для аутентификации).
    */
   async findByEmail(email: string) {
-    return this.db.orm.public.User
-      .where({ email })
-      .first();
+    return this.db.orm.public.User.where({ email }).first();
   }
 
   /**
@@ -123,9 +136,9 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto) {
     await this.findById(id);
 
-    const updated = await this.db.orm.public.User
-      .update(updateUserDto)
-      .where({ id });
+    const updated = await this.db.orm.public.User.update(updateUserDto).where({
+      id,
+    });
 
     // Инвалидируем кеш
     await this.redisService.del(`user:${id}`);
@@ -137,12 +150,18 @@ export class UsersService {
         timestamp: new Date().toISOString(),
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to publish event: ${errorMessage}`);
     }
 
     // Убираем чувствительные данные
-    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = updated;
+    const { 
+			passwordHash: _passwordHash,
+			twoFactorSecret: _twoFactorSecret,
+			twoFactorBackupCodes: _twoFactorBackupCodes,
+			...safeUser 
+		} = updated;
     return safeUser;
   }
 
@@ -152,9 +171,9 @@ export class UsersService {
   async deactivate(id: string) {
     await this.findById(id);
 
-    const deactivated = await this.db.orm.public.User
-      .update({ isActive: false })
-      .where({ id });
+    const deactivated = await this.db.orm.public.User.update({
+      isActive: false,
+    }).where({ id });
 
     await this.redisService.del(`user:${id}`);
 
@@ -164,11 +183,17 @@ export class UsersService {
         timestamp: new Date().toISOString(),
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to publish event: ${errorMessage}`);
     }
 
-    const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...safeUser } = deactivated;
+    const { 
+			passwordHash: _passwordHash,
+			twoFactorSecret: _twoFactorSecret,
+			twoFactorBackupCodes: _twoFactorBackupCodes, 
+			...safeUser 
+		} = deactivated;
     return safeUser;
   }
 }

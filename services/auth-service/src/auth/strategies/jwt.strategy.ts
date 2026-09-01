@@ -23,8 +23,7 @@ export interface JwtPayload {
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-	
-	private readonly logger = new Logger(JwtStrategy.name);
+  private readonly logger = new Logger(JwtStrategy.name);
 
   constructor(
     private readonly usersService: UsersService,
@@ -39,7 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         // Затем Authorization header
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
-      secretOrKey: process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me_123',
+      secretOrKey:
+        process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me_123',
       ignoreExpiration: false,
       passReqToCallback: true,
     });
@@ -54,14 +54,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    */
   async validate(req: Request, payload: JwtPayload) {
     try {
-			this.logger.debug(`Validating JWT for user ${payload.sub}`);
+      this.logger.debug(`Validating JWT for user ${payload.sub}`);
       this.logger.debug(`JTI: ${payload.jti}`);
       this.logger.debug(`Type: ${payload.type}`);
 
       // Проверка jti в Redis
       if (payload.jti) {
-        const sessionExists = await this.redisService.exists(`session:${payload.jti}`);
-				this.logger.debug(`Session exists: ${sessionExists}`);
+        const sessionExists = await this.redisService.exists(
+          `session:${payload.jti}`,
+        );
+        this.logger.debug(`Session exists: ${sessionExists}`);
         if (!sessionExists) {
           throw new UnauthorizedException('Session has been revoked');
         }
@@ -69,14 +71,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
       // Проверка типа токена
       if (payload.type && payload.type !== 'access') {
+        this.logger.warn(`Invalid token type: ${payload.type}`);
 
-				this.logger.warn(`Invalid token type: ${payload.type}`);
-        
-				throw new UnauthorizedException('Invalid token type');
+        throw new UnauthorizedException('Invalid token type');
       }
 
       const user = await this.usersService.findById(payload.sub);
-      
+
       if (!user.isActive) {
         throw new UnauthorizedException('User is not active');
       }
@@ -88,8 +89,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         jti: payload.jti,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			this.logger.error(`JWT validation failed: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`JWT validation failed: ${errorMessage}`);
       throw new UnauthorizedException(`Invalid token: ${errorMessage}`);
     }
   }

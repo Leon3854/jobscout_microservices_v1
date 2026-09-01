@@ -33,12 +33,14 @@ export class HealthController {
 
     // Проверяем базу данных через Prisma 8
     try {
-      const result = await this.db.orm.public.User
-        .select(['id'])
+			await this.db.orm.public.User.select(['id'])
         .limit(1)
         .first();
-      
-      health.components.database = { status: 'ok', message: 'Database responding' };
+
+      health.components.database = {
+        status: 'ok',
+        message: 'Database responding',
+      };
     } catch (error: any) {
       health.components.database = { status: 'error', message: error.message };
       health.status = 'error';
@@ -48,7 +50,10 @@ export class HealthController {
     try {
       const redisPing = await this.redisService.ping();
       if (!redisPing) {
-        health.components.redis = { status: 'error', message: 'Redis not responding' };
+        health.components.redis = {
+          status: 'error',
+          message: 'Redis not responding',
+        };
         health.status = 'error';
       }
     } catch (error: any) {
@@ -60,9 +65,9 @@ export class HealthController {
     try {
       const rabbitOk = await this.queueService.healthCheck();
       if (!rabbitOk) {
-        health.components.rabbitmq = { 
-          status: 'warning', 
-          message: 'RabbitMQ not connected (lazy connection)' 
+        health.components.rabbitmq = {
+          status: 'warning',
+          message: 'RabbitMQ not connected (lazy connection)',
         };
       }
     } catch (error: any) {

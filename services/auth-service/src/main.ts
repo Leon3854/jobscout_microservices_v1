@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // Security: Helmet для HTTP заголовков безопасности
   app.use(helmet());
-  
+
   // Compression: Сжатие ответов
   app.use(compression());
 
@@ -26,7 +26,9 @@ async function bootstrap() {
 
   // CORS: Настройка Cross-Origin Resource Sharing
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || [process.env.FRONTEND_URL || 'http://localhost:3000'],
+    origin: process.env.CORS_ORIGIN?.split(',') || [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key'],
