@@ -2,7 +2,7 @@ import { IsString, IsNotEmpty } from 'class-validator';
 
 /**
  * DTO для обновления токенов.
- * 
+ *
  * @example
  * ```typescript
  * const dto = new RefreshTokenDto();

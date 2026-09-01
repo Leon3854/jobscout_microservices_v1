@@ -10,17 +10,17 @@ export interface EmailOptions {
    * Email получателя.
    */
   to: string;
-  
+
   /**
    * Тема письма.
    */
   subject: string;
-  
+
   /**
    * Текст письма (plain text).
    */
   text?: string;
-  
+
   /**
    * HTML содержимое письма.
    */
@@ -30,7 +30,7 @@ export interface EmailOptions {
 /**
  * Сервис для отправки email.
  * Использует nodemailer с SMTP.
- * 
+ *
  * @class EmailService
  */
 @Injectable()
@@ -52,10 +52,10 @@ export class EmailService {
 
   /**
    * Отправить email.
-   * 
+   *
    * @param options - Параметры письма
    * @returns Информация об отправке
-   * 
+   *
    * @example
    * ```typescript
    * await emailService.send({
@@ -75,17 +75,19 @@ export class EmailService {
         text: options.text,
         html: options.html,
       });
-      
+
       this.logger.log(`Email sent to ${options.to}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}: ${error.message}`);
+      this.logger.error(
+        `Failed to send email to ${options.to}: ${error.message}`,
+      );
       throw error;
     }
   }
 
   /**
    * Отправить email с кодом подтверждения.
-   * 
+   *
    * @param to - Email получателя
    * @param code - Код подтверждения
    */
@@ -110,7 +112,7 @@ export class EmailService {
 
   /**
    * Отправить email для сброса пароля.
-   * 
+   *
    * @param to - Email получателя
    * @param resetLink - Ссылка для сброса пароля
    */

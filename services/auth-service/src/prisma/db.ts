@@ -6,7 +6,7 @@ import { join } from 'path';
 
 // Загружаем contract.json через fs (обход import attributes)
 const contractJson = JSON.parse(
-  readFileSync(join(__dirname, 'contract.json'), 'utf-8')
+  readFileSync(join(__dirname, 'contract.json'), 'utf-8'),
 );
 
 export const db = postgres<Contract>({

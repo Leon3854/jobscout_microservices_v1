@@ -1,11 +1,27 @@
 // src/auth/auth.controller.ts
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Req, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiCookieAuth,
+} from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
 /**
@@ -56,12 +72,13 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     // Приоритет cookie над body
-    const refreshToken = req.cookies?.refresh_token || refreshTokenDto.refreshToken;
-    
+    const refreshToken =
+      req.cookies?.refresh_token || refreshTokenDto.refreshToken;
+
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
     }
-    
+
     return this.authService.refreshTokens(refreshToken, res);
   }
 
@@ -82,8 +99,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const accessToken = req.cookies?.access_token;
-    const refreshToken = req.cookies?.refresh_token || refreshTokenDto.refreshToken;
-    
+    const refreshToken =
+      req.cookies?.refresh_token || refreshTokenDto.refreshToken;
+
     await this.authService.logout(accessToken, refreshToken, res);
     return { message: 'Logout successful' };
   }
@@ -99,7 +117,10 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiCookieAuth('access_token')
   @ApiOperation({ summary: 'Logout from all devices' })
-  @ApiResponse({ status: 200, description: 'Logout from all devices successful' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logout from all devices successful',
+  })
   async logoutAll(@Req() req: any) {
     await this.authService.logoutAll(req.user.id);
     return { message: 'Logout from all devices successful' };

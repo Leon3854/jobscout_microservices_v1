@@ -4,11 +4,15 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UsersService } from '../../users/users.service';
 
 @Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
+export class JwtRefreshStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
   constructor(private readonly usersService: UsersService) {
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
-      secretOrKey: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me_456',
+      secretOrKey:
+        process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me_456',
       ignoreExpiration: false,
     });
   }
@@ -16,7 +20,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
   async validate(payload: any) {
     try {
       const user = await this.usersService.findById(payload.sub);
-      
+
       if (!user.isActive) {
         throw new UnauthorizedException('User is not active');
       }
@@ -25,7 +29,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         id: user.id,
         email: user.email,
       };
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

@@ -65,7 +65,10 @@ export class AuthService {
       }
 
       if (user.twoFactorEnabled && twoFactorCode) {
-        const is2FAValid = await this.verifyTwoFactorCode(user.id, twoFactorCode);
+        const is2FAValid = await this.verifyTwoFactorCode(
+          user.id,
+          twoFactorCode,
+        );
         if (!is2FAValid) {
           throw new UnauthorizedException('Invalid 2FA code');
         }
@@ -75,7 +78,7 @@ export class AuthService {
 
       // Генерация токенов с jti
       const tokens = await this.generateTokens(user);
-      
+
       // Установка cookies если передан Response
       if (res) {
         this.setTokenCookies(res, tokens);
@@ -88,7 +91,8 @@ export class AuthService {
       return tokens;
     } catch (error) {
       // Безопасное извлечение сообщения об ошибке
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Login failed for ${email}: ${errorMessage}`);
       throw error;
     }
@@ -110,13 +114,17 @@ export class AuthService {
       });
 
       // Проверка не отозван ли токен
-      const isRevoked = await this.redisService.exists(`revoked:${refreshToken}`);
+      const isRevoked = await this.redisService.exists(
+        `revoked:${refreshToken}`,
+      );
       if (isRevoked) {
         throw new UnauthorizedException('Refresh token has been revoked');
       }
 
       // Проверка существования сессии
-      const sessionExists = await this.redisService.exists(`session:${payload.jti}`);
+      const sessionExists = await this.redisService.exists(
+        `session:${payload.jti}`,
+      );
       if (!sessionExists) {
         throw new UnauthorizedException('Session not found');
       }
@@ -146,7 +154,8 @@ export class AuthService {
       return tokens;
     } catch (error) {
       // Безопасное извлечение сообщения об ошибке
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Token refresh failed: ${errorMessage}`);
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -158,12 +167,16 @@ export class AuthService {
    * @param refreshToken - Refresh token для отзыва
    * @param res - Express Response для очистки cookies
    */
-  async logout(accessToken?: string, refreshToken?: string, res?: Response): Promise<void> {
+  async logout(
+    accessToken?: string,
+    refreshToken?: string,
+    res?: Response,
+  ): Promise<void> {
     // Отзыв refresh token
     if (refreshToken) {
       await this.revokeRefreshToken(refreshToken);
     }
-    
+
     // Отзыв сессии по access token
     if (accessToken) {
       try {
@@ -173,15 +186,20 @@ export class AuthService {
         await this.revokeSession(payload.jti);
       } catch (error) {
         // Токен может быть уже истекшим
-        this.logger.debug('Access token already expired');
+        // this.logger.debug('Access token already expired');
+				if (error instanceof UnauthorizedException && error.message.includes('reuse')) {
+					throw error;
+				}
+				this.logger.error('Token refresh failed');
+				throw new UnauthorizedException('Invalid refresh token');
       }
     }
-    
+
     // Очистка cookies
     if (res) {
       this.clearTokenCookies(res);
     }
-    
+
     this.logger.log('User logged out');
   }
 
@@ -192,16 +210,17 @@ export class AuthService {
    */
   async logoutAll(userId: string): Promise<void> {
     // Получаем все сессии пользователя
-    const sessions = await this.redisService.get<any[]>(`user_sessions:${userId}`) || [];
-    
+    const sessions =
+      (await this.redisService.get<any[]>(`user_sessions:${userId}`)) || [];
+
     // Отзываем каждую сессию
     for (const session of sessions) {
       await this.redisService.del(`session:${session.jti}`);
     }
-    
+
     // Очищаем список сессий
     await this.redisService.del(`user_sessions:${userId}`);
-    
+
     this.logger.log(`All sessions revoked for user ${userId}`);
   }
 
@@ -213,94 +232,98 @@ export class AuthService {
    * @private
    */
   private async generateTokens(user: any): Promise<TokenResponseDto> {
-		try {
-			// Генерация уникальных jti для токенов
-			const accessJti = uuidv4();
-			const refreshJti = uuidv4();
-	
-			this.logger.debug(`Generating tokens for user ${user.id}`);
-			this.logger.debug(`Access JTI: ${accessJti}`);
-			this.logger.debug(`Refresh JTI: ${refreshJti}`);
-	
-			const payload = {
-				sub: user.id,
-				email: user.email,
-				fullName: user.fullName,
-				jti: accessJti,
-				type: 'access',
-			};
-	
-			// Генерация access token
-			const accessToken = await this.jwtService.signAsync(payload, {
-				secret: process.env.JWT_ACCESS_SECRET,
-				expiresIn: (process.env.JWT_ACCESS_EXPIRES as any) || '15m',
-			});
-	
-			// Генерация refresh token
-			const refreshToken = await this.jwtService.signAsync(
-				{ 
-					sub: user.id, 
-					jti: refreshJti,
-					type: 'refresh',
-				},
-				{
-					secret: process.env.JWT_REFRESH_SECRET,
-					expiresIn: (process.env.JWT_REFRESH_EXPIRES as any) || '7d',
-				},
-			);
-	
-			// Сохранение сессии в Redis
-			const sessionData = {
-				userId: user.id,
-				accessJti,
-				refreshJti,
-				createdAt: new Date().toISOString(),
-			};
-	
-			this.logger.debug('Saving session to Redis...');
-			
-			// Сохраняем сессию с TTL = время жизни access token (15 минут)
-			await this.redisService.set(
-				`session:${accessJti}`,
-				sessionData,
-				900, // 15 минут
-			);
-			this.logger.debug(`Session saved: session:${accessJti}`);
-	
-			// Сохраняем refresh token в Redis (7 дней)
-			await this.redisService.set(
-				`refresh:${user.id}:${refreshToken}`,
-				{ valid: true, jti: refreshJti, accessJti },
-				604800, // 7 дней
-			);
-			this.logger.debug(`Refresh token saved: refresh:${user.id}:${refreshToken}`);
-	
-			// Добавляем сессию в список сессий пользователя
-			const userSessions = await this.redisService.get<any[]>(`user_sessions:${user.id}`) || [];
-			userSessions.push(sessionData);
-			await this.redisService.set(
-				`user_sessions:${user.id}`,
-				userSessions,
-				604800, // 7 дней
-			);
-			this.logger.debug(`User sessions updated: user_sessions:${user.id}`);
-	
-			return {
-				accessToken,
-				refreshToken,
-				tokenType: 'Bearer',
-				expiresIn: 900,
-				user: {
-					id: user.id,
-					email: user.email,
-					fullName: user.fullName,
-				},
-			};
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-			this.logger.error(`Failed to generate tokens: ${errorMessage}`);
-			throw error;
-		}
+    try {
+      // Генерация уникальных jti для токенов
+      const accessJti = uuidv4();
+      const refreshJti = uuidv4();
+
+      this.logger.debug(`Generating tokens for user ${user.id}`);
+      this.logger.debug(`Access JTI: ${accessJti}`);
+      this.logger.debug(`Refresh JTI: ${refreshJti}`);
+
+      const payload = {
+        sub: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        jti: accessJti,
+        type: 'access',
+      };
+
+      // Генерация access token
+      const accessToken = await this.jwtService.signAsync(payload, {
+        secret: process.env.JWT_ACCESS_SECRET,
+        expiresIn: (process.env.JWT_ACCESS_EXPIRES as any) || '15m',
+      });
+
+      // Генерация refresh token
+      const refreshToken = await this.jwtService.signAsync(
+        {
+          sub: user.id,
+          jti: refreshJti,
+          type: 'refresh',
+        },
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: (process.env.JWT_REFRESH_EXPIRES as any) || '7d',
+        },
+      );
+
+      // Сохранение сессии в Redis
+      const sessionData = {
+        userId: user.id,
+        accessJti,
+        refreshJti,
+        createdAt: new Date().toISOString(),
+      };
+
+      this.logger.debug('Saving session to Redis...');
+
+      // Сохраняем сессию с TTL = время жизни access token (15 минут)
+      await this.redisService.set(
+        `session:${accessJti}`,
+        sessionData,
+        900, // 15 минут
+      );
+      this.logger.debug(`Session saved: session:${accessJti}`);
+
+      // Сохраняем refresh token в Redis (7 дней)
+      await this.redisService.set(
+        `refresh:${user.id}:${refreshToken}`,
+        { valid: true, jti: refreshJti, accessJti },
+        604800, // 7 дней
+      );
+      this.logger.debug(
+        `Refresh token saved: refresh:${user.id}:${refreshToken}`,
+      );
+
+      // Добавляем сессию в список сессий пользователя
+      const userSessions =
+        (await this.redisService.get<any[]>(`user_sessions:${user.id}`)) || [];
+      userSessions.push(sessionData);
+      await this.redisService.set(
+        `user_sessions:${user.id}`,
+        userSessions,
+        604800, // 7 дней
+      );
+      this.logger.debug(`User sessions updated: user_sessions:${user.id}`);
+
+      return {
+        accessToken,
+        refreshToken,
+        tokenType: 'Bearer',
+        expiresIn: 900,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+        },
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to generate tokens: ${errorMessage}`);
+      throw error;
+    }
   }
 
   /**
@@ -385,7 +408,7 @@ export class AuthService {
   private async trackFailedAttempt(email: string): Promise<void> {
     const key = `login:${email}`;
     const attempts = await this.redisService.increment(key, 900);
-    
+
     if (attempts >= 5) {
       await this.redisService.set(key, 900, 900);
       this.logger.warn(`Account locked for ${email} due to too many attempts`);
@@ -408,7 +431,10 @@ export class AuthService {
    * @returns true если код верный
    * @private
    */
-  private async verifyTwoFactorCode(userId: string, code: string): Promise<boolean> {
+  private async verifyTwoFactorCode(
+    _userId: string,
+    _code: string,
+  ): Promise<boolean> {
     // TODO: Реализовать проверку 2FA кода
     return true;
   }

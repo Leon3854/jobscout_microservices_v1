@@ -13,11 +13,7 @@ import { RedisModule } from '../redis/redis.module';
  * Объединяет сервисы, контроллеры и стратегии аутентификации.
  */
 @Module({
-  imports: [
-    UsersModule,
-    RedisModule,
-    JwtModule.register({}),
-  ],
+  imports: [UsersModule, RedisModule, JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtRefreshStrategy],
   exports: [AuthService],
