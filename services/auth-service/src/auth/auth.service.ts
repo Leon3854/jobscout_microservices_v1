@@ -6,7 +6,6 @@ import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
 import { TokenResponseDto } from './dto/token-response.dto';
 import { Response } from 'express';
-import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -53,7 +52,7 @@ export class AuthService {
       }
 
       // Проверка пароля
-      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      const isPasswordValid = await this.usersService.verifyPassword(user, password);
       if (!isPasswordValid) {
         await this.trackFailedAttempt(email);
         throw new UnauthorizedException('Invalid credentials');

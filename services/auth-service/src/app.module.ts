@@ -9,6 +9,8 @@ import { RedisModule } from './redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
 
 @Module({
   imports: [
@@ -30,5 +32,11 @@ import { HealthModule } from './health/health.module';
     TwoFactorModule,
     EmailModule,
   ],
+	providers: [
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: IdempotencyInterceptor,
+		}
+	]
 })
 export class AppModule {}
