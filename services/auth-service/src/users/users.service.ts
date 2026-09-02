@@ -1,199 +1,168 @@
-import {
-  Injectable,
-  Inject,
-  ConflictException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
-import { PRISMA_DB } from '../prisma/prisma.module';
+// src/users/users.service.ts
+import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import { db } from '../prisma/db';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { RedisService } from '../redis/redis.service';
-import { QueueService } from '../queue/queue.service';
-import * as bcrypt from 'bcrypt';
 
+/**
+ * Сервис пользователей.
+ * Обрабатывает CRUD операции с пользователями.
+ * Использует Argon2id для хеширования паролей.
+ */
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(
-    @Inject(PRISMA_DB) private readonly db: any,
-    private readonly redisService: RedisService,
-    private readonly queueService: QueueService,
-  ) {}
+  /**
+   * Конфигурация Argon2id.
+   * Параметры оптимизированы для безопасности.
+   */
+  private readonly argon2Options = {
+    type: argon2.argon2id,
+    memoryCost: 65536, // 64 MB
+    timeCost: 3,       // 3 итерации
+    parallelism: 1,    // 1 поток
+  } as const;
 
   /**
-   * Создать нового пользователя с профилем.
+   * Создание нового пользователя.
+   * @param createUserDto - DTO с данными пользователя
+   * @returns Созданный пользователь без чувствительных данных
+   * @throws ConflictException - если email уже существует
    */
   async create(createUserDto: CreateUserDto) {
-    const lockKey = `user:create:${createUserDto.email}`;
-    const locked = await this.redisService.lock(lockKey, 10);
+    const existingUser = await db.orm.public.User.where({
+      email: createUserDto.email,
+    }).first();
 
-    if (!locked) {
-      throw new ConflictException('Operation in progress, please try again');
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
     }
 
-    try {
-      // Проверяем существование пользователя
-      const existingUser = await this.db.orm.public.User.where({
-        email: createUserDto.email,
-      }).first();
+    // Хешируем пароль с Argon2id
+    const passwordHash = await argon2.hash(createUserDto.password, this.argon2Options);
 
-      if (existingUser) {
-        throw new ConflictException('User with this email already exists');
-      }
+    const user = await db.orm.public.User.create({
+      email: createUserDto.email,
+      passwordHash,
+      fullName: createUserDto.fullName,
+      isActive: true,
+			twoFactorBackupCodes: [],
+			twoFactorSecret: null,
+    });
 
-      // Хешируем пароль
-      const passwordHash = await bcrypt.hash(createUserDto.password, 12);
+    this.logger.log(`User created: ${user.id}`);
 
-      // Создаём пользователя
-      const user = await this.db.orm.public.User.create({
-        email: createUserDto.email,
-        passwordHash,
-        fullName: createUserDto.fullName,
-        isActive: true,
-        twoFactorEnabled: false,
-        twoFactorSecret: null,
-        twoFactorBackupCodes: [],
-      });
+    // Возвращаем пользователя без чувствительных данных
+    const safeUser = { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser.twoFactorSecret;
+    delete safeUser.twoFactorBackupCodes;
 
-      // Создаём профиль
-      await this.db.orm.public.UserProfile.create({
-        userId: user.id,
-        bio: null,
-        skills: [],
-        experienceYears: 0,
-      });
-
-      // Отправляем событие
-      try {
-        await this.queueService.publish('user.created', {
-          userId: user.id,
-          email: user.email,
-          timestamp: new Date().toISOString(),
-        });
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        this.logger.warn(`Failed to publish event: ${errorMessage}`);
-      }
-
-      this.logger.log(`User created: ${user.email}`);
-
-      // Возвращаем без пароля
-      const {
-        passwordHash: _passwordHash,
-        twoFactorSecret: _twoFactorSecret,
-        twoFactorBackupCodes: _twoBackupCodes,
-        ...safeUser
-      } = user;
-      return safeUser;
-    } finally {
-      await this.redisService.unlock(lockKey);
-    }
+    return safeUser;
   }
 
   /**
-   * Найти пользователя по ID (без пароля).
+   * Поиск пользователя по email.
+   * @param email - Email пользователя
+   * @returns Пользователь или null
+   */
+  async findByEmail(email: string) {
+    const user = await db.orm.public.User.where({ email }).first();
+    return user || null;
+  }
+
+  /**
+   * Поиск пользователя по ID.
+   * @param id - ID пользователя
+   * @returns Пользователь без чувствительных данных
+   * @throws NotFoundException - если пользователь не найден
    */
   async findById(id: string) {
-    // Пробуем получить из кеша
-    const cached = await this.redisService.get(`user:${id}`);
-    if (cached) {
-      return cached;
-    }
-
-    const user = await this.db.orm.public.User.where({ id }).first();
+    const user = await db.orm.public.User.where({ id }).first();
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Убираем чувствительные данные
-    const {
-      passwordHash: _passwordHash,
-      twoFactorSecret: _twoFactorSecret,
-      twoFactorBackupCodes: _twoFactorBackupCodes,
-      ...safeUser
-    } = user;
-
-    // Кешируем на 5 минут
-    await this.redisService.set(`user:${id}`, safeUser, 300);
+    // Возвращаем пользователя без чувствительных данных
+    const safeUser = { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser.twoFactorSecret;
+    delete safeUser.twoFactorBackupCodes;
 
     return safeUser;
   }
 
   /**
-   * Найти пользователя по email (включая пароль для аутентификации).
-   */
-  async findByEmail(email: string) {
-    return this.db.orm.public.User.where({ email }).first();
-  }
-
-  /**
-   * Обновить данные пользователя.
+   * Обновление пользователя.
+   * @param id - ID пользователя
+   * @param updateUserDto - DTO с обновляемыми данными
+   * @returns Обновленный пользователь без чувствительных данных
+   * @throws NotFoundException - если пользователь не найден
    */
   async update(id: string, updateUserDto: UpdateUserDto) {
-    await this.findById(id);
+    const existingUser = await db.orm.public.User.where({ id }).first();
 
-    const updated = await this.db.orm.public.User.update(updateUserDto).where({
-      id,
-    });
-
-    // Инвалидируем кеш
-    await this.redisService.del(`user:${id}`);
-
-    // Отправляем событие
-    try {
-      await this.queueService.publish('user.updated', {
-        userId: id,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Failed to publish event: ${errorMessage}`);
+    if (!existingUser) {
+      throw new NotFoundException('User not found');
     }
 
-    // Убираем чувствительные данные
-    const { 
-			passwordHash: _passwordHash,
-			twoFactorSecret: _twoFactorSecret,
-			twoFactorBackupCodes: _twoFactorBackupCodes,
-			...safeUser 
-		} = updated;
+    const updateData: any = { ...updateUserDto };
+
+    // Если обновляется пароль, хешируем его с Argon2id
+    if (updateUserDto.password) {
+      updateData.passwordHash = await argon2.hash(updateUserDto.password, this.argon2Options);
+      delete updateData.password;
+    }
+
+    const updatedUser = await db.orm.public.User.update(updateData).where({ id });
+
+    // Возвращаем пользователя без чувствительных данных
+    const safeUser = { ...updatedUser };
+    delete safeUser.passwordHash;
+    delete safeUser.twoFactorSecret;
+    delete safeUser.twoFactorBackupCodes;
+
     return safeUser;
   }
 
   /**
-   * Деактивировать пользователя.
+   * Верификация пароля пользователя.
+   * @param user - Объект пользователя с passwordHash
+   * @param password - Пароль для проверки
+   * @returns true если пароль верный
    */
-  async deactivate(id: string) {
-    await this.findById(id);
-
-    const deactivated = await this.db.orm.public.User.update({
-      isActive: false,
-    }).where({ id });
-
-    await this.redisService.del(`user:${id}`);
-
+  async verifyPassword(user: any, password: string): Promise<boolean> {
     try {
-      await this.queueService.publish('user.deactivated', {
-        userId: id,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Failed to publish event: ${errorMessage}`);
+      // Проверяем, является ли хеш Argon2id
+      if (user.passwordHash.startsWith('$argon2id$') || user.passwordHash.startsWith('$argon2')) {
+        return await argon2.verify(user.passwordHash, password);
+      }
+      
+      // Обратная совместимость с bcrypt (для старых пользователей)
+      if (user.passwordHash.startsWith('$2b$') || user.passwordHash.startsWith('$2a$')) {
+        const bcrypt = require('bcrypt');
+        const isValid = await bcrypt.compare(password, user.passwordHash);
+        
+        // Если пароль верный, обновляем хеш на Argon2id
+        if (isValid) {
+          const newHash = await argon2.hash(password, this.argon2Options);
+          await db.orm.public.User.update({
+            passwordHash: newHash,
+          }).where({ id: user.id });
+          this.logger.log(`Password hash upgraded to Argon2id for user ${user.id}`);
+        }
+        
+        return isValid;
+      }
+      
+      return false;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Password verification failed: ${errorMessage}`);
+      return false;
     }
-
-    const { 
-			passwordHash: _passwordHash,
-			twoFactorSecret: _twoFactorSecret,
-			twoFactorBackupCodes: _twoFactorBackupCodes, 
-			...safeUser 
-		} = deactivated;
-    return safeUser;
   }
 }

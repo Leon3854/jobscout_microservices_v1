@@ -5,9 +5,11 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 
-// Мокаем bcrypt
-jest.mock('bcrypt', () => ({
-  compare: jest.fn().mockResolvedValue(true),
+// Мокаем argon2
+jest.mock('argon2', () => ({
+  hash: jest.fn().mockResolvedValue('$argon2id$mock-hash'),
+  verify: jest.fn().mockResolvedValue(true),
+  argon2id: 2,
 }));
 
 // Мокаем uuid
@@ -57,6 +59,7 @@ describe('AuthService', () => {
           useValue: {
             findByEmail: jest.fn(),
             findById: jest.fn(),
+            verifyPassword: jest.fn().mockResolvedValue(true),
           },
         },
         {
@@ -86,7 +89,7 @@ describe('AuthService', () => {
         id: 'user-id',
         email: 'test@example.com',
         fullName: 'Test User',
-        passwordHash: 'hashed-password',
+        passwordHash: '$argon2id$mock-hash',
         isActive: true,
         twoFactorEnabled: false,
       };
@@ -97,6 +100,7 @@ describe('AuthService', () => {
       };
 
       jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser);
+      jest.spyOn(usersService, 'verifyPassword').mockResolvedValue(true);
 
       const result = await service.login(loginDto);
 
@@ -104,6 +108,7 @@ describe('AuthService', () => {
       expect(result.accessToken).toBe('mock-token');
       expect(result.refreshToken).toBe('mock-token');
       expect(usersService.findByEmail).toHaveBeenCalledWith('test@example.com');
+      expect(usersService.verifyPassword).toHaveBeenCalledWith(mockUser, 'password123');
     });
 
     it('should throw UnauthorizedException for invalid credentials', async () => {

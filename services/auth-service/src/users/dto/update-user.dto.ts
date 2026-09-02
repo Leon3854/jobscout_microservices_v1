@@ -1,8 +1,36 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+// src/users/dto/update-user.dto.ts
+import { IsEmail, IsOptional, IsString, MinLength, Matches } from 'class-validator';
 
+/**
+ * DTO для обновления пользователя.
+ */
 export class UpdateUserDto {
+  /**
+   * Email пользователя.
+   * @optional
+   */
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  /**
+   * Полное имя пользователя.
+   * @optional
+   */
   @IsOptional()
   @IsString()
-  @MaxLength(255)
   fullName?: string;
+
+  /**
+   * Пароль пользователя.
+   * Минимум 8 символов, должен содержать заглавную букву, строчную букву и цифру.
+   * @optional
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+  })
+  password?: string;
 }
