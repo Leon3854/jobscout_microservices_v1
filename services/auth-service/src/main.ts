@@ -66,9 +66,39 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
-  const port = process.env.PORT || 3001;
-  await app.listen(port);
-  logger.log(`Auth Service running on port ${port}`);
+	// Берем строку из .env (или '3001')
+  const rawPort: string = process.env.PORT || '3001';
+
+	// ПРИМЕНЯЕМ РЕГУЛЯРНОЕ ВЫРАЖЕНИЕ: 
+  // Удаляем из строки всё, кроме чистых цифр
+  const cleanPortString: string = rawPort.replace(/\D/g, '');
+
+	// Теперь превращаем очищенную строку в число
+  let port: number = Number(cleanPortString) || 3001;
+
+  // let port = process.env.PORT || 3002;
+
+  // await app.listen(port);
+  // logger.log(`Auth Service running on port ${port}`);
+
+	// Математика теперь работает идеально
+  const maxPortAttempts: number = port + 10; 
+  let isListening = false;
+
+	while (!isListening && port <= maxPortAttempts) {
+    try {
+      await app.listen(port);
+      isListening = true;
+      logger.log(`🚀 Auth Service successfully running on port ${port}`);
+    } catch (error: any) {
+      if (error.code === 'EADDRINUSE') {
+        logger.warn(`Port ${port} is busy, trying next one...`);
+        port++;
+      } else {
+        throw error;
+      }
+    }
+	}
 }
 
 bootstrap();

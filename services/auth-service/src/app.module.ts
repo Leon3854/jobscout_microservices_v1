@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -31,6 +32,8 @@ import { IdempotencyInterceptor } from './common/interceptors/idempotency.interc
     UsersModule,
     TwoFactorModule,
     EmailModule,
+		ScheduleModule.forRoot(), // 2. Регистрируем глобально для всего приложения!
+		QueueModule
   ],
 	providers: [
 		{

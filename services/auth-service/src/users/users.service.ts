@@ -4,6 +4,9 @@ import * as argon2 from 'argon2';
 import { db } from '../prisma/db';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import * as bcrypt from 'bcrypt';
+import { OutboxService } from '../queue/outbox.service';
+
 
 /**
  * Сервис пользователей.
@@ -13,6 +16,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+
+	constructor(
+		private readonly outboxService: OutboxService,
+	) {}
 
   /**
    * Конфигурация Argon2id.
@@ -52,7 +59,20 @@ export class UsersService {
 			twoFactorSecret: null,
     });
 
-    this.logger.log(`User created: ${user.id}`);
+		// Добавляем событие в outbox
+		try {
+			this.logger.log(`Creating user...`);
+			await this.outboxService.addEvent('user.created', {
+				userId: user.id,
+				email: user.email,
+				fullName: user.fullName,
+				timestamp: new Date().toISOString(),
+			});
+			this.logger.log(`Outbox event added for user ${user.id}`);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			this.logger.error(`Failed to add outbox event: ${errorMessage}`);
+		}
 
     // Возвращаем пользователя без чувствительных данных
     const safeUser = { ...user };
@@ -69,7 +89,7 @@ export class UsersService {
    * @returns Пользователь или null
    */
   async findByEmail(email: string) {
-    const user = await db.orm.public.User.where({ email }).first();
+    const user = await db.orm.public.User.one({ email });
     return user || null;
   }
 
@@ -80,7 +100,7 @@ export class UsersService {
    * @throws NotFoundException - если пользователь не найден
    */
   async findById(id: string) {
-    const user = await db.orm.public.User.where({ id }).first();
+    const user = await db.orm.public.User.one({ id });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -103,7 +123,7 @@ export class UsersService {
    * @throws NotFoundException - если пользователь не найден
    */
   async update(id: string, updateUserDto: UpdateUserDto) {
-    const existingUser = await db.orm.public.User.where({ id }).first();
+    const existingUser = await db.orm.public.User.one({ id });
 
     if (!existingUser) {
       throw new NotFoundException('User not found');
@@ -117,7 +137,10 @@ export class UsersService {
       delete updateData.password;
     }
 
-    const updatedUser = await db.orm.public.User.update(updateData).where({ id });
+    const updatedUser = await db.orm.public.User.update({
+			id,
+			 ...updateData, // ваши новые поля для обновления
+		});
 
     // Возвращаем пользователя без чувствительных данных
     const safeUser = { ...updatedUser };
@@ -143,8 +166,7 @@ export class UsersService {
       
       // Обратная совместимость с bcrypt (для старых пользователей)
       if (user.passwordHash.startsWith('$2b$') || user.passwordHash.startsWith('$2a$')) {
-        const bcrypt = require('bcrypt');
-        const isValid = await bcrypt.compare(password, user.passwordHash);
+				const isValid = await bcrypt.compare(password, user.passwordHash);
         
         // Если пароль верный, обновляем хеш на Argon2id
         if (isValid) {
