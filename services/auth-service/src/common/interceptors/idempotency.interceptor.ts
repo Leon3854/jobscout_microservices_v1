@@ -9,7 +9,7 @@ import {
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { RedisService } from '../../redis/redis.service';
-import { v4 as uuidv4 } from 'uuid';
+
 
 /**
  * Интерцептор для обработки Idempotency Keys.

@@ -56,3 +56,16 @@ model RefreshToken {
 
   @@index([userId])
 }
+
+
+model OutboxEvent {
+  id          String   @id @default(uuid())
+  eventType   String
+  payload     Json
+  status      String   @default("pending") // pending, sent, failed
+  createdAt   TimestamptzString @default(now())
+  sentAt      TimestamptzString?
+  retryCount  Int      @default(0)
+
+@@map("outboxEvent")
+}
