@@ -34,13 +34,11 @@ export class OutboxService {
     }
   }
 
-	async processPendingEvents(): Promise<void> {
-    // this.logger.debug(`Checking table: public.outboxEvent`);
-    
-    // В Prisma 8 Runtime условия передаются ПЛОСКИМ объектом на верхнем уровне!
-    const pendingEvent = await db.orm.public.OutboxEvent.first({
+  async processPendingEvents(): Promise<void> {
+    // 1. Находим первое pending событие
+    const pendingEvent = await db.orm.public.OutboxEvent.where({
       status: 'pending',
-    });
+    }).first();
 
     if (!pendingEvent) {
       return;
@@ -48,11 +46,11 @@ export class OutboxService {
 
     this.logger.debug(`Processing event: ${pendingEvent.id}`);
     try {
+      // 2. Отправляем в RabbitMQ
       await this.queueService.publish(pendingEvent.eventType, pendingEvent.payload);
       
-      // Наш уже проверенный плоский апдейт
-      await db.orm.public.OutboxEvent.update({
-        id: pendingEvent.id,
+      // 3. НОВЫЙ ВАРИАНТ: Сначала фильтруем по ID, затем накатываем .update()
+      await db.orm.public.OutboxEvent.where({ id: pendingEvent.id }).update({
         status: 'sent',
       });
       
@@ -64,20 +62,27 @@ export class OutboxService {
       const newRetryCount = (pendingEvent.retryCount || 0) + 1;
       
       if (newRetryCount >= 5) {
-        await db.orm.public.OutboxEvent.update({
-          id: pendingEvent.id,
+        // При превышении попыток
+        await db.orm.public.OutboxEvent.where({ id: pendingEvent.id }).update({
           status: 'failed',
           retryCount: newRetryCount,
         });
         this.logger.error(`Event ${pendingEvent.id} marked as failed after 5 attempts`);
       } else {
-        await db.orm.public.OutboxEvent.update({
-          id: pendingEvent.id,
+        // Просто инкрементируем счетчик
+        await db.orm.public.OutboxEvent.where({ id: pendingEvent.id }).update({
           retryCount: newRetryCount,
         });
       }
     }
   }
+
+
+
+
+
+
+
 
 
 }
