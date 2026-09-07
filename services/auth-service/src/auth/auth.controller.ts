@@ -13,7 +13,7 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -42,6 +42,7 @@ export class AuthController {
    */
   @Post('login')
   @UseGuards(ThrottlerGuard)
+	@Throttle({ login: { limit: 5, ttl: 900000 } }) // 5 попыток за 15 минут
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful' })

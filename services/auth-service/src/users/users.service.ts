@@ -89,7 +89,7 @@ export class UsersService {
    * @returns Пользователь или null
    */
   async findByEmail(email: string) {
-    const user = await db.orm.public.User.one({ email });
+    const user = await db.orm.public.User.where({ email }).first();
     return user || null;
   }
 
