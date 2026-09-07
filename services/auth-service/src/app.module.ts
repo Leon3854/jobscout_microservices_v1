@@ -12,18 +12,43 @@ import { HealthModule } from './health/health.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import Redis from 'ioredis';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
-    ]),
+		ThrottlerModule.forRootAsync({
+			useFactory: () => {
+				const redis = new Redis({
+					host: process.env.REDIS_HOST || 'localhost',
+					port: parseInt(process.env.REDIS_PORT || '6379'),
+				});
+		
+				return {
+					throttlers: [
+						{
+							name: 'global',
+							ttl: 60000, // 60 секунд
+							limit: 100, // 100 запросов в минуту
+						},
+						{
+							name: 'login',
+							ttl: 900000, // 15 минут
+							limit: 5, // 5 попыток логина
+						},
+						{
+							name: 'email',
+							ttl: 60000, // 60 секунд
+							limit: 1, // 1 письмо в минуту
+						},
+					],
+					storage: new ThrottlerStorageRedisService(redis),
+				};
+			},
+		}),
     PrismaModule,
     RedisModule,
     QueueModule,
@@ -33,7 +58,6 @@ import { ScheduleModule } from '@nestjs/schedule';
     TwoFactorModule,
     EmailModule,
 		ScheduleModule.forRoot(), // 2. Регистрируем глобально для всего приложения!
-		QueueModule
   ],
 	providers: [
 		{
