@@ -1,44 +1,29 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { RedisService } from '../redis/redis.service';
 
 /**
  * Интерфейс для отправки email.
  */
 export interface EmailOptions {
-  /**
-   * Email получателя.
-   */
-  to: string;
-
-  /**
-   * Тема письма.
-   */
-  subject: string;
-
-  /**
-   * Текст письма (plain text).
-   */
-  text?: string;
-
-  /**
-   * HTML содержимое письма.
-   */
-  html?: string;
+  
+  to: string; // Email получателя.
+  subject: string; // Тема письма.
+  text?: string; // Текст письма (plain text).
+  html?: string; // HTML содержимое письма.
 }
 
 /**
- * Сервис для отправки email.
- * Использует nodemailer с SMTP.
- *
- * @class EmailService
- */
+* Сервис для отправки email с защитой от спама.
+* Использует nodemailer с SMTP и Redis для rate limiting.
+*/
 @Injectable()
 export class EmailService {
   private readonly transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
 
-  constructor() {
+  constructor(private readonly redisService: RedisService) {
     this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_PORT || '587'),
@@ -50,12 +35,35 @@ export class EmailService {
     });
   }
 
+	/**
+   * Проверка rate limit для email.
+   * Не более 1 письма в 60 секунд на адрес.
+   * @param email - Email получателя
+   * @throws TooManyRequestsException - при превышении лимита
+   * @private
+   */
+	private async checkRateLimit(email: string): Promise<void> {
+    const key = `email:rate:${email}`;
+    const exists = await this.redisService.exists(key);
+
+    if (exists) {
+      this.logger.warn(`Rate limit exceeded for email: ${email}`);
+      throw new BadRequestException(
+        'Too many emails sent to this address. Please try again in 60 seconds.',
+      );
+    }
+
+    // Устанавливаем ключ с TTL 60 секунд
+    await this.redisService.set(key, { sentAt: new Date().toISOString() }, 60);
+  }
+
+
   /**
    * Отправить email.
    *
-   * @param options - Параметры письма
    * @returns Информация об отправке
-   *
+   * Отправить email с проверкой rate limit.
+   * @param options - Параметры письма
    * @example
    * ```typescript
    * await emailService.send({
@@ -67,6 +75,10 @@ export class EmailService {
    * ```
    */
   async send(options: EmailOptions): Promise<void> {
+		// Проверяем rate limit
+    await this.checkRateLimit(options.to);
+
+    // Отправляем email
     try {
       await this.transporter.sendMail({
         from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
@@ -78,9 +90,8 @@ export class EmailService {
 
       this.logger.log(`Email sent to ${options.to}`);
     } catch (error) {
-      this.logger.error(
-        `Failed to send email to ${options.to}: ${error.message}`,
-      );
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to send email to ${options.to}: ${errorMessage}`);
       throw error;
     }
   }
