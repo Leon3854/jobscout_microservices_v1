@@ -100,7 +100,7 @@ export class UsersService {
    * @throws NotFoundException - если пользователь не найден
    */
   async findById(id: string) {
-    const user = await db.orm.public.User.one({ id });
+    const user = await db.orm.public.User.where({ id }).first();
 
     if (!user) {
       throw new NotFoundException('User not found');

@@ -1,0 +1,14 @@
+# services/auth-service/.dockerignore
+node_modules
+dist
+coverage
+.git
+.gitignore
+*.log
+npm-debug.log*
+.env.local
+.env.development
+.env.test
+README.md
+typedoc.json
+test
