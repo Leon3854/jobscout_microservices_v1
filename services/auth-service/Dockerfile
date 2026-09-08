@@ -1,59 +1,64 @@
-# ============================================
-# JobScout Auth Service - Dockerfile
-# ============================================
+# services/auth-service/Dockerfile
 
-# ---------- Build Stage ----------
-FROM node:20-alpine AS build
+# ============ BUILD STAGE ============
+FROM node:22-alpine AS build
+
+# Устанавливаем Python и build tools для argon2
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm ci --only=production
+# Устанавливаем все зависимости
+RUN npm ci --legacy-peer-deps
 
-# Копируем исходники
+# Копируем исходный код
 COPY . .
 
-# Генерируем Prisma client
-RUN npx prisma generate
+# Генерируем Prisma контракт
+RUN npx prisma contract emit
 
 # Собираем приложение
 RUN npm run build
 
-# ---------- Production Stage ----------
-FROM node:20-alpine AS production
+# ============ PRODUCTION STAGE ============
+FROM node:22-alpine AS production
 
-WORKDIR /app
+# Устанавливаем Python для argon2 (если нужен на runtime)
+RUN apk add --no-cache python3
 
-# Создаём непривилегированного пользователя
+# Создаем непривилегированного пользователя
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
+
+WORKDIR /app
 
 # Копируем package.json
 COPY package*.json ./
 
-# Устанавливаем только production зависимости
-RUN npm ci --only=production && npm cache clean --force
+# Устанавливаем production зависимости
+RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Копируем собранное приложение
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/src/prisma ./src/prisma
-COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/src/prisma/contract.json ./src/prisma/contract.json
+COPY --from=build /app/src/prisma/contract.d.ts ./src/prisma/contract.d.ts
+COPY --from=build /app/src/prisma/contract.prisma ./src/prisma/contract.prisma
 
-# Копируем .env.example как шаблон
-COPY .env.example ./.env.example
+# Копируем .env
+COPY .env ./
 
 # Переключаемся на непривилегированного пользователя
 USER nestjs
 
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "fetch('http://localhost:3001/api/v1/health').then(r=>r.json()).then(d=>process.exit(d.status==='ok'?0:1)).catch(()=>process.exit(1))"
+
 # Открываем порт
 EXPOSE 3001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://localhost:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-
-# Запускаем приложение
+# Запускаем
 CMD ["node", "dist/main.js"]

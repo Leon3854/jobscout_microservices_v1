@@ -1,9 +1,20 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "rootDir": "..",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": ["ts-jest", {
+      "tsconfig": "<rootDir>/tsconfig.json",
+      "diagnostics": false,
+      "isolatedModules": true
+    }]
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(uuid|@prisma|@nestjs|argon2|bcrypt|ioredis|@nest-lab)/)"
+  ],
+  "moduleNameMapper": {
+    "^@prisma/orm-postgres/runtime$": "<rootDir>/node_modules/@prisma/orm-postgres/dist/runtime.mjs",
+    "^uuid$": "uuid"
   }
 }
