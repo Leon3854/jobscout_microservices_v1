@@ -13,8 +13,8 @@
 #   3. docker-build   — сборка и пуш образа в DockerHub (только main)
 #
 # Секреты (Settings → Secrets → Actions):
-#   - POSTGRES_PASSWORD, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
 #   - DOCKER_USERNAME, DOCKER_PASSWORD
+#   - CODECOV_TOKEN (опционально)
 # =============================================================================
 
 name: Auth Service CI/CD
@@ -106,7 +106,7 @@ jobs:
       # 3. Чистая установка зависимостей (по package-lock.json)
       - name: Install dependencies
         working-directory: ${{ env.WORKING_DIRECTORY }}
-        run: npm ci # npm ci по умолчанию ставит и prod, и dev
+        run: npm ci --legacy-peer-deps # npm ci по умолчанию ставит и prod, и dev
 
       # 4. Линтинг кода (ESLint) + unit-тесты
       - name: Lint
