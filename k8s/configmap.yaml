@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  namespace: jobscout
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  RABBITMQ_URL: "amqp://jobscout:rabbitmq_dev_password@rabbitmq:5672"
+  DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/jobscout_db?schema=public"
+  JWT_ACCESS_EXPIRES: "15m"
+  JWT_REFRESH_EXPIRES: "7d"
+  TOTP_ISSUER: "JobScout"
