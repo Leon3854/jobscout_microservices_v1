@@ -1,76 +1,106 @@
+# =============================================================================
+# Docker Compose — локальная инфраструктура JobScout
+# =============================================================================
+# Поднимает 4 контейнера:
+#   1. postgres       — PostgreSQL 16 (данные в volume postgres_data)
+#   2. redis          — Redis 7 (сессии, rate limit, idempotency)
+#   3. rabbitmq       — RabbitMQ 3 + management UI
+#   4. auth-service   — Nest.js приложение (собирается из Dockerfile)
+#
+# Переменные берутся из .env (в корне проекта):
+#   POSTGRES_PASSWORD, RABBITMQ_PASSWORD, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
+#
+# Запуск:    docker compose up -d
+# Остановка: docker compose down
+# Логи:      docker compose logs -f auth-service
+# =============================================================================
+
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: jobscout-postgres
+    image: postgres:16-alpine # Образ PostgreSQL 16 на Alpine Linux (лёгкий)
+    container_name: jobscout-postgres # Имя контейнера (а не автоматическое)
     environment:
-      POSTGRES_DB: jobscout_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: jobscout_db # Имя базы, которая создастся автоматически
+      POSTGRES_USER: postgres # Имя пользователя БД
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Пароль для доступа к базе данных
     ports:
-      - "5432:5432"
+      - "5432:5432" # Порт для доступа к базе данных host:container — порт 5432 доступен снаружи контейнера и внутри контейнера
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data # Точка монтирования для данных базы данных - Данные сохраняются в volume (не теряются при рестарте)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U postgres"] # Проверка доступности базы данных проверка: PostgreSQL готов?
+      interval: 10s # Интервал между попытками проверки доступности базы данных
+      timeout: 5s # Таймаут для проверки доступности базы данных
+      retries: 5 # Количество попыток проверки доступности базы данных (по умолчанию 5)
 
   redis:
-    image: redis:7-alpine
-    container_name: jobscout-redis
+    image: redis:7-alpine # Образ Redis 7 на Alpine Linux (лёгкий)
+    container_name: jobscout-redis # Имя контейнера (а не автоматическое)
     ports:
-      - "6379:6379"
+      - "6379:6379" # Порт для доступа к Redis
+    command: >
+      redis-server # запуск Redis с конфигом - запуск Redis с конфигом
+      --maxmemory 256mb # максимальный размер памяти - максимальный размер памяти
+      --maxmemory-policy noeviction # политика удаления ключей - политика удаления ключей
+      --appendonly yes # запись в лог - запись в лог
+      --appendfsync everysec # запись в лог каждую секунду - запись в лог каждую секунду
+      --save 900 1 # запись в лог каждые 900 секунд - запись в лог каждые 900 секунд
+      --save 300 10 # запись в лог каждые 300 секунд - запись в лог каждые 300 секунд
+      --save 60 10000 # запись в лог каждые 60 секунд - запись в лог каждые 60 секунд
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro   # конфиг - данные сохраняются в volume (не теряются при рестарте)
+    command: redis-server /usr/local/etc/redis/redis.conf       # запуск с конфигом - запуск с конфигом
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "redis-cli", "ping"] # Проверка доступности Redis
+      interval: 10s # Интервал между попытками проверки доступности Redis
+      timeout: 5s # Таймаут для проверки доступности Redis
+      retries: 5 # Количество попыток проверки доступности Redis (по умолчанию 5 неудачь)
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: jobscout-rabbitmq
+    image: rabbitmq:3-management-alpine # Образ RabbitMQ 3 на Alpine Linux (лёгкий)
+    container_name: jobscout-rabbitmq # Имя контейнера (а не автоматическое)
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672" # Порт для доступа к RabbitMQ
+      - "15672:15672" # Порт для доступа к RabbitMQ Management
     environment:
-      RABBITMQ_DEFAULT_USER: jobscout
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: jobscout # Имя пользователя для доступа к RabbitMQ (по умолчанию jobscout)
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD} # Пароль для доступа к RabbitMQ (по умолчанию ${RABBITMQ_PASSWORD})
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"] # Проверка доступности RabbitMQ
+      interval: 10s # Интервал между попытками проверки доступности RabbitMQ
+      timeout: 5s # Таймаут для проверки доступности RabbitMQ
+      retries: 5 # Количество попыток проверки доступности RabbitMQ (по умолчанию 5)
 
   # 👇 Добавляем auth-service
   auth-service:
-    build:
+    build: # Построение сервиса auth-service
       context: ./services/auth-service
-      dockerfile: Dockerfile
-    container_name: jobscout-auth-service
+      dockerfile: Dockerfile # Файл Dockerfile для построения сервиса auth-service
+    container_name: jobscout-auth-service # Имя контейнера (а не автоматическое)
     ports:
-      - "3001:3001"
+      - "3001:3001" # Порт для доступа к сервису auth-service
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/jobscout_db?schema=public
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      NODE_ENV: production # Среда для сервиса auth-service
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/jobscout_db?schema=public # URL для доступа к базе данных
+      REDIS_HOST: redis # Хост для доступа к Redis
+      REDIS_PORT: 6379 # Порт для доступа к Redis
       RABBITMQ_URL: amqp://jobscout:${RABBITMQ_PASSWORD}@rabbitmq:5672
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET} # Секрет для доступа к JWT
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET} # Секрет для доступа к JWT
     depends_on:
-      postgres:
+      postgres: # Зависимость от сервиса postgres
         condition: service_healthy
-      redis:
+      redis: # Зависимость от сервиса redis
         condition: service_healthy
-      rabbitmq:
+      rabbitmq: # Зависимость от сервиса rabbitmq
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/v1/health').then(r=>r.json()).then(d=>process.exit(d.status==='ok'?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      interval: 30s # Интервал между попытками проверки доступности сервиса auth-service      
+      timeout: 10s # Таймаут для проверки доступности сервиса auth-service
+      retries: 3 # Количество попыток проверки доступности сервиса auth-service (по умолчанию 3)
+      start_period: 30s # Задержка перед началом проверки доступности сервиса auth-service
 
 volumes:
-  postgres_data:
+  postgres_data: # Точка монтирования для данных базы данных  
