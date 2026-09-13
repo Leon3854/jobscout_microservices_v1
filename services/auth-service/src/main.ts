@@ -1,11 +1,11 @@
 // src/main.ts
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { AppModule } from './app.module';
-import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
-import compression from 'compression';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestFactory } from '@nestjs/core';              // Создаёт Nest-приложение
+import { ValidationPipe, Logger } from '@nestjs/common'; // Валидация + логирование
+import { AppModule } from './app.module';                // Корневой модуль проекта
+import helmet from 'helmet';                             // HTTP-заголовки безопасности
+import cookieParser from 'cookie-parser';                // Парсинг cookies
+import compression from 'compression';                   // Сжатие ответов (gzip)
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'; // Swagger UI
 
 /**
  * Инициализация и запуск Nest.js приложения.
