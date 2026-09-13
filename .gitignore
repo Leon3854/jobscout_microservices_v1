@@ -1,22 +1,9 @@
-node_modules/
-.env
+
 .git
-
 docs/
-docs
-
-
 coverage/
-coverage
-
 tests/
-tests
-
 test/
-test
-
-README.md
-
 
 # Dependencies
 node_modules/
@@ -26,6 +13,7 @@ __pycache__/
 # Environment
 .env
 .env.local
+.env.example
 
 # Build
 dist/
