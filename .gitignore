@@ -44,3 +44,13 @@ logs/
 
 # Database
 *.sqlite
+
+.agents/
+.claude/
+.cursor/
+.devin/
+.gemini/
+.grok/
+.huggingface/
+.openai/
+.perplexity/
